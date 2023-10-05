@@ -31,6 +31,7 @@ namespace Microsoft.Exchange.WebServices.Data
     using System.Net.Http;
     using System.Net.Http.Headers;
     using System.Net.Security;
+    using System.Security.Authentication;
     using System.Security.Cryptography.X509Certificates;
     using System.Text;
     using System.Threading;
@@ -51,15 +52,36 @@ namespace Microsoft.Exchange.WebServices.Data
         /// Initializes a new instance of the <see cref="EwsHttpWebRequest"/> class.
         /// </summary>
         /// <param name="uri">The URI.</param>
-        internal EwsHttpWebRequest(Uri uri)
+        /// <param name="allowSelfSignedCertificates">If true, self signed certificates allowed.</param>
+        internal EwsHttpWebRequest(Uri uri, bool allowSelfSignedCertificates)
         {
             Method = "GET";
             RequestUri = uri;
-            _httpClientHandler = new HttpClientHandler()
+
+            _httpClientHandler = new HttpClientHandler
             {
+                CheckCertificateRevocationList = !allowSelfSignedCertificates,
+                SslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13,
+                AllowAutoRedirect = true,
+                PreAuthenticate = true,
+                UseCookies = true,
                 AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
             };
+
+            if (allowSelfSignedCertificates)
+            {
+                _httpClientHandler.ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => true;
+            }
+
             _httpClient = new HttpClient(_httpClientHandler);
+
+            _httpClient.DefaultRequestHeaders.ConnectionClose = false;
+            _httpClient.DefaultRequestHeaders.ExpectContinue = true;
+            _httpClient.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue
+            {
+                NoCache = true,
+                MaxAge = TimeSpan.Zero
+            };
         }
 
         #region IEwsHttpWebRequest Members

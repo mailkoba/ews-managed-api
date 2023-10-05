@@ -40,10 +40,11 @@ namespace Microsoft.Exchange.WebServices.Data
         /// Create a new instance of <see cref="EwsHttpWebRequest"/>.
         /// </summary>
         /// <param name="uri">The service URI.</param>
+        /// <param name="allowSelfSignedCertificates">If true, self signed certificates allowed.</param>
         /// <returns>An instance of <see cref="IEwsHttpWebRequest"/>./// </returns>
-        IEwsHttpWebRequest IEwsHttpWebRequestFactory.CreateRequest(Uri uri)
+        IEwsHttpWebRequest IEwsHttpWebRequestFactory.CreateRequest(Uri uri, bool allowSelfSignedCertificates)
         {
-            return new EwsHttpWebRequest(uri);
+            return new EwsHttpWebRequest(uri, allowSelfSignedCertificates);
         }
 
         /// <summary>

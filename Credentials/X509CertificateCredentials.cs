@@ -128,7 +128,7 @@ namespace Microsoft.Exchange.WebServices.Data
             WSSecurityUtilityIdSignedXml signedXml = new WSSecurityUtilityIdSignedXml(document);
             signedXml.SignedInfo.CanonicalizationMethod = SignedXml.XmlDsigExcC14NTransformUrl;
 
-            signedXml.SigningKey = this.certificate.PrivateKey;
+            signedXml.SigningKey = this.certificate.GetRSAPrivateKey();
             signedXml.AddReference("/soap:Envelope/soap:Header/wsa:To");
             signedXml.AddReference("/soap:Envelope/soap:Header/wsse:Security/wsu:Timestamp");
 

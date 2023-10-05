@@ -23,6 +23,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+using System.Runtime.InteropServices;
+
 namespace Microsoft.Exchange.WebServices.Data
 {
     using System;
@@ -30,11 +32,7 @@ namespace Microsoft.Exchange.WebServices.Data
     using System.Globalization;
     using System.IO;
     using System.Net;
-    using System.Net.Http;
     using System.Net.Http.Headers;
-#if NETSTANDARD2_0
-    using System.Runtime.InteropServices;
-#endif
     using System.Security.Cryptography;
     using System.Xml;
 
@@ -127,11 +125,13 @@ namespace Microsoft.Exchange.WebServices.Data
         /// based on the configuration of this service object.
         /// </summary>
         /// <param name="url">The URL that the HttpWebRequest should target.</param>
+        /// <param name="allowSelfSignedCertificates">If true, self signed certificates allowed.</param>
         /// <param name="acceptGzipEncoding">If true, ask server for GZip compressed content.</param>
         /// <param name="allowAutoRedirect">If true, redirection responses will be automatically followed.</param>
         /// <returns>A initialized instance of HttpWebRequest.</returns>
         internal IEwsHttpWebRequest PrepareHttpWebRequestForUrl(
             Uri url,
+            bool allowSelfSignedCertificates,
             bool acceptGzipEncoding,
             bool allowAutoRedirect)
         {
@@ -141,7 +141,7 @@ namespace Microsoft.Exchange.WebServices.Data
                 throw new ServiceLocalException(string.Format(Strings.UnsupportedWebProtocol, url.Scheme));
             }
 
-            IEwsHttpWebRequest request = this.HttpWebRequestFactory.CreateRequest(url);
+            IEwsHttpWebRequest request = this.HttpWebRequestFactory.CreateRequest(url, allowSelfSignedCertificates);
             try
             {
 
@@ -188,11 +188,8 @@ namespace Microsoft.Exchange.WebServices.Data
                         throw new ServiceLocalException(Strings.CredentialsRequired);
                     }
 
-#if NETSTANDARD2_0
-                // Temporary fix for authentication on Linux platform
-                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    serviceCredentials = AdjustLinuxAuthentication(url, serviceCredentials);
-#endif
+                    // Temporary fix for authentication on Linux platform
+                    serviceCredentials = AdjustAuthentication(url, serviceCredentials);
 
                     // Make sure that credentials have been authenticated if required
                     serviceCredentials.PreAuthenticate();
@@ -215,22 +212,27 @@ namespace Microsoft.Exchange.WebServices.Data
             }
         }
 
-        internal ExchangeCredentials AdjustLinuxAuthentication(Uri url, ExchangeCredentials serviceCredentials)
+        internal ExchangeCredentials AdjustAuthentication(Uri url, ExchangeCredentials serviceCredentials)
         {
-            if (!(serviceCredentials is WebCredentials))
+            if (!(serviceCredentials is WebCredentials webCredentials))
+            {
                 // Nothing to adjust
                 return serviceCredentials;
-
-            var networkCredentials = ((WebCredentials)serviceCredentials).Credentials as NetworkCredential;
-            if (networkCredentials != null)
-            {
-                CredentialCache credentialCache = new CredentialCache();
-                credentialCache.Add(url, "NTLM", networkCredentials);
-                credentialCache.Add(url, "Digest", networkCredentials);
-                credentialCache.Add(url, "Basic", networkCredentials);
-
-                serviceCredentials = credentialCache;
             }
+
+            if (webCredentials.Credentials is NetworkCredential networkCredentials)
+            {
+                var credentialCache = new CredentialCache
+                {
+                    { url, "NTLM", networkCredentials },
+                    { url, "Negotiate", networkCredentials },
+                    { url, "Digest", networkCredentials },
+                    { url, "Basic", networkCredentials }
+                };
+
+                serviceCredentials = new WebCredentials(credentialCache);
+            }
+
             return serviceCredentials;
         }
 
